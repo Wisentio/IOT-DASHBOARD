@@ -1,0 +1,417 @@
+import React, { useMemo, useState } from "react";
+import { Activity, AlertTriangle, Battery, Cpu, MapPin, Plus, Radio, Send, Thermometer, Droplets } from "lucide-react";
+
+const initialDevices = [
+  {
+    deviceId: "greenhouse-01",
+    name: "Greenhouse Sensor",
+    location: "Greenhouse A",
+    temperature: 24.8,
+    humidity: 58,
+    battery: 91,
+    status: "OK",
+    lastSeen: "2 min ago",
+  },
+  {
+    deviceId: "warehouse-01",
+    name: "Warehouse Sensor",
+    location: "Storage Room",
+    temperature: 31.4,
+    humidity: 64,
+    battery: 43,
+    status: "WARNING",
+    lastSeen: "6 min ago",
+  },
+  {
+    deviceId: "lab-esp32-01",
+    name: "ESP32 Prototype",
+    location: "Lab Desk",
+    temperature: 38.2,
+    humidity: 82,
+    battery: 14,
+    status: "OK",
+    lastSeen: "just now",
+  },
+];
+
+const initialReadings = [
+  { deviceId: "greenhouse-01", temperature: 24.8, humidity: 58, battery: 91, timestamp: "10:00" },
+  { deviceId: "warehouse-01", temperature: 31.4, humidity: 64, battery: 43, timestamp: "10:02" },
+  { deviceId: "lab-esp32-01", temperature: 38.2, humidity: 82, battery: 14, timestamp: "10:05" },
+];
+
+const initialAlerts = [
+  {
+    id: "alert-001",
+    deviceId: "lab-esp32-01",
+    type: "HIGH_TEMPERATURE",
+    message: "Temperature is above 35°C",
+    value: "38.2°C",
+    status: "OPEN",
+    createdAt: "10:05",
+  },
+  {
+    id: "alert-002",
+    deviceId: "lab-esp32-01",
+    type: "LOW_BATTERY",
+    message: "Battery level is below 20%",
+    value: "14%",
+    status: "OPEN",
+    createdAt: "10:05",
+  },
+];
+
+function getStatus({ temperature, humidity, battery }) {
+  if (temperature >= 35 || humidity >= 80 || battery <= 20) return "ALERT";
+  if (temperature >= 30 || humidity >= 70 || battery <= 40) return "WARNING";
+  return "OK";
+}
+
+function statusClass(status) {
+  if (status === "ALERT") return "bg-red-100 text-red-700 border-red-200";
+  if (status === "WARNING") return "bg-yellow-100 text-yellow-700 border-yellow-200";
+  return "bg-green-100 text-green-700 border-green-200";
+}
+
+function StatCard({ title, value, icon: Icon }) {
+  return (
+    <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-100">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-slate-500">{title}</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-900">{value}</p>
+        </div>
+        <div className="rounded-xl bg-slate-100 p-3">
+          <Icon className="h-6 w-6 text-slate-700" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeviceCard({ device }) {
+  return (
+    <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-100">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <Cpu className="h-5 w-5 text-slate-600" />
+            <h3 className="font-semibold text-slate-900">{device.name}</h3>
+          </div>
+          <p className="mt-1 text-sm text-slate-500">{device.deviceId}</p>
+          <p className="mt-2 flex items-center gap-1 text-sm text-slate-500">
+            <MapPin className="h-4 w-4" /> {device.location}
+          </p>
+        </div>
+        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClass(device.status)}`}>
+          {device.status}
+        </span>
+      </div>
+
+      <div className="mt-5 grid grid-cols-3 gap-3">
+        <div className="rounded-xl bg-slate-50 p-3">
+          <Thermometer className="mb-1 h-4 w-4 text-slate-500" />
+          <p className="text-sm font-semibold">{device.temperature}°C</p>
+          <p className="text-xs text-slate-500">Temp</p>
+        </div>
+        <div className="rounded-xl bg-slate-50 p-3">
+          <Droplets className="mb-1 h-4 w-4 text-slate-500" />
+          <p className="text-sm font-semibold">{device.humidity}%</p>
+          <p className="text-xs text-slate-500">Humidity</p>
+        </div>
+        <div className="rounded-xl bg-slate-50 p-3">
+          <Battery className="mb-1 h-4 w-4 text-slate-500" />
+          <p className="text-sm font-semibold">{device.battery}%</p>
+          <p className="text-xs text-slate-500">Battery</p>
+        </div>
+      </div>
+
+      <p className="mt-4 text-xs text-slate-400">Last seen: {device.lastSeen}</p>
+    </div>
+  );
+}
+
+export default function App() {
+  // Later taken from DynamoDB
+  const [devices, setDevices] = useState(initialDevices);
+  const [readings, setReadings] = useState(initialReadings);
+  const [alerts, setAlerts] = useState(initialAlerts);
+  const [newDevice, setNewDevice] = useState({ deviceId: "", name: "", location: "" });
+  const [telemetry, setTelemetry] = useState({
+    deviceId: "greenhouse-01",
+    temperature: "25",
+    humidity: "60",
+    battery: "90",
+  });
+
+  const totals = useMemo(() => {
+    return {
+      devices: devices.length,
+      alerts: alerts.filter((alert) => alert.status === "OPEN").length,
+      ok: devices.filter((device) => device.status === "OK").length,
+      messages: readings.length,
+    };
+  }, [devices, alerts, readings]);
+
+  function addDevice(event) {
+    event.preventDefault();
+    if (!newDevice.deviceId || !newDevice.name) return;
+
+    const device = {
+      ...newDevice,
+      temperature: 0,
+      humidity: 0,
+      battery: 100,
+      status: "OK",
+      lastSeen: "never",
+    };
+
+    setDevices((current) => [device, ...current]);
+    setNewDevice({ deviceId: "", name: "", location: "" });
+  }
+
+  function sendTelemetry(event) {
+    event.preventDefault();
+
+    const reading = {
+      deviceId: telemetry.deviceId,
+      temperature: Number(telemetry.temperature),
+      humidity: Number(telemetry.humidity),
+      battery: Number(telemetry.battery),
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+
+    const status = getStatus(reading);
+
+    setDevices((current) =>
+      current.map((device) =>
+        device.deviceId === reading.deviceId
+          ? {
+              ...device,
+              temperature: reading.temperature,
+              humidity: reading.humidity,
+              battery: reading.battery,
+              status,
+              lastSeen: "just now",
+            }
+          : device
+      )
+    );
+
+    setReadings((current) => [reading, ...current]);
+
+    const generatedAlerts = [];
+    if (reading.temperature >= 35) {
+      generatedAlerts.push({
+        id: crypto.randomUUID(),
+        deviceId: reading.deviceId,
+        type: "HIGH_TEMPERATURE",
+        message: "Temperature is above 35°C",
+        value: `${reading.temperature}°C`,
+        status: "OPEN",
+        createdAt: reading.timestamp,
+      });
+    }
+    if (reading.humidity >= 80) {
+      generatedAlerts.push({
+        id: crypto.randomUUID(),
+        deviceId: reading.deviceId,
+        type: "HIGH_HUMIDITY",
+        message: "Humidity is above 80%",
+        value: `${reading.humidity}%`,
+        status: "OPEN",
+        createdAt: reading.timestamp,
+      });
+    }
+    if (reading.battery <= 20) {
+      generatedAlerts.push({
+        id: crypto.randomUUID(),
+        deviceId: reading.deviceId,
+        type: "LOW_BATTERY",
+        message: "Battery level is below 20%",
+        value: `${reading.battery}%`,
+        status: "OPEN",
+        createdAt: reading.timestamp,
+      });
+    }
+
+    if (generatedAlerts.length > 0) {
+      setAlerts((current) => [...generatedAlerts, ...current]);
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-100 p-6 text-slate-900">
+      <div className="mx-auto max-w-7xl">
+        <header className="mb-8 rounded-3xl bg-slate-950 p-8 text-white shadow-lg">
+          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
+            <div>
+              <div className="mb-3 flex items-center gap-2 text-sm text-slate-300">
+                <Radio className="h-4 w-4" /> Cloud IoT Monitoring Platform
+              </div>
+              <h1 className="text-3xl font-bold md:text-5xl">IoT Device Dashboard</h1>
+              <p className="mt-3 max-w-2xl text-slate-300">
+                Monitor simulated sensors, send telemetry, detect abnormal readings, and prepare the app for real IoT devices later.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white/10 p-4 text-sm">
+              <p className="font-semibold">Backend flow later:</p>
+              <p className="mt-1 text-slate-300">API Gateway → Lambda → DynamoDB → SNS → SQS</p>
+            </div>
+          </div>
+        </header>
+
+        <section className="mb-6 grid gap-4 md:grid-cols-4">
+          <StatCard title="Registered devices" value={totals.devices} icon={Cpu} />
+          <StatCard title="Healthy devices" value={totals.ok} icon={Activity} />
+          <StatCard title="Open alerts" value={totals.alerts} icon={AlertTriangle} />
+          <StatCard title="Telemetry messages" value={totals.messages} icon={Send} />
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold">Live devices</h2>
+              <span className="text-sm text-slate-500">Mock data now, API data later</span>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {devices.map((device) => (
+                // <DeviceCard key={device.deviceId} device={device} />
+                <DeviceCard device={device} />
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <form onSubmit={addDevice} className="rounded-2xl bg-white p-5 shadow-sm border border-slate-100">
+              <div className="mb-4 flex items-center gap-2">
+                <Plus className="h-5 w-5" />
+                <h2 className="text-lg font-bold">Add device</h2>
+              </div>
+              <div className="space-y-3">
+                <input
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-slate-500"
+                  placeholder="Device ID, e.g. sensor-02"
+                  value={newDevice.deviceId}
+                  onChange={(e) => setNewDevice({ ...newDevice, deviceId: e.target.value })}
+                />
+                <input
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-slate-500"
+                  placeholder="Device name"
+                  value={newDevice.name}
+                  onChange={(e) => setNewDevice({ ...newDevice, name: e.target.value })}
+                />
+                <input
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-slate-500"
+                  placeholder="Location"
+                  value={newDevice.location}
+                  onChange={(e) => setNewDevice({ ...newDevice, location: e.target.value })}
+                />
+                <button className="w-full rounded-xl bg-slate-950 px-4 py-2 font-semibold text-white hover:bg-slate-800">
+                  Add device
+                </button>
+              </div>
+            </form>
+
+            <form onSubmit={sendTelemetry} className="rounded-2xl bg-white p-5 shadow-sm border border-slate-100">
+              <div className="mb-4 flex items-center gap-2">
+                <Send className="h-5 w-5" />
+                <h2 className="text-lg font-bold">Telemetry simulator</h2>
+              </div>
+              <div className="space-y-3">
+                <select
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-slate-500"
+                  value={telemetry.deviceId}
+                  onChange={(e) => setTelemetry({ ...telemetry, deviceId: e.target.value })}
+                >
+                  {devices.map((device) => (
+                    <option key={device.deviceId} value={device.deviceId}>
+                      {device.deviceId}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-slate-500"
+                  placeholder="Temperature"
+                  value={telemetry.temperature}
+                  onChange={(e) => setTelemetry({ ...telemetry, temperature: e.target.value })}
+                />
+                <input
+                  type="number"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-slate-500"
+                  placeholder="Humidity"
+                  value={telemetry.humidity}
+                  onChange={(e) => setTelemetry({ ...telemetry, humidity: e.target.value })}
+                />
+                <input
+                  type="number"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-slate-500"
+                  placeholder="Battery"
+                  value={telemetry.battery}
+                  onChange={(e) => setTelemetry({ ...telemetry, battery: e.target.value })}
+                />
+                <button className="w-full rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700">
+                  Send telemetry
+                </button>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <section className="mt-6 grid gap-6 lg:grid-cols-2">
+          <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-100">
+            <h2 className="mb-4 text-xl font-bold">Recent telemetry</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b text-slate-500">
+                  <tr>
+                    <th className="py-3">Time</th>
+                    <th>Device</th>
+                    <th>Temp</th>
+                    <th>Humidity</th>
+                    <th>Battery</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {readings.slice(0, 8).map((reading, index) => (
+                    <tr key={`${reading.deviceId}-${reading.timestamp}-${index}`} className="border-b last:border-0">
+                      <td className="py-3">{reading.timestamp}</td>
+                      <td>{reading.deviceId}</td>
+                      <td>{reading.temperature}°C</td>
+                      <td>{reading.humidity}%</td>
+                      <td>{reading.battery}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-white p-5 shadow-sm border border-slate-100">
+            <h2 className="mb-4 text-xl font-bold">Alerts</h2>
+            <div className="space-y-3">
+              {alerts.length === 0 && <p className="text-sm text-slate-500">No alerts yet.</p>}
+              {alerts.slice(0, 8).map((alert) => (
+                <div key={alert.id} className="rounded-xl border border-red-100 bg-red-50 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-red-800">{alert.type}</p>
+                      <p className="text-sm text-red-700">{alert.message}</p>
+                      <p className="mt-1 text-xs text-red-600">
+                        {alert.deviceId} · {alert.value} · {alert.createdAt}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-red-700">
+                      {alert.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
