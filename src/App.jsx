@@ -147,7 +147,7 @@ export default function App() {
   });
   useEffect(() => {
     async function loadDevices() {
-      const res = await fetch(`${API_BASE_URL}/devices`);
+      const res = await fetch(`${API_BASE_URL}/dashboard`);
       const data = await res.json();
       setDevices(data);
     }
