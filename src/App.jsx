@@ -199,7 +199,10 @@ export default function App() {
     setNewDevice({ deviceId: "", name: "", location: "" });
   }
 
-  function sendTelemetry(event) {
+  // Function simulates sending telemetry data from a device.
+  // It creates a reading object based on the current telemetry state,
+  // determines the device status, and updates the readings state.
+  async function sendTelemetry(event) {
     event.preventDefault();
 
     const reading = {
@@ -207,28 +210,44 @@ export default function App() {
       temperature: Number(telemetry.temperature),
       humidity: Number(telemetry.humidity),
       battery: Number(telemetry.battery),
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
+    // Later will be handled by backend,
+    // but for now we can directly determine the status here based on the reading
+    // values and update the device list accordingly.
     const status = getStatus(reading);
 
-    setDevices((current) =>
-      current.map((device) =>
-        device.deviceId === reading.deviceId
-          ? {
-              ...device,
-              temperature: reading.temperature,
-              humidity: reading.humidity,
-              battery: reading.battery,
-              status,
-              lastSeen: "just now",
-            }
-          : device
-      )
-    );
+    // Get the latest device info.
+    const res = await fetch(`${API_BASE_URL}/telemetry`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(reading),
+    });
 
-    setReadings((current) => [reading, ...current]);
+    if (!res.ok) {
+      console.error("Failed to send telemetry");
+      return;
+    }
 
+    // Reload dashboard after backend saves telemetry
+    const dashboardRes = await fetch(`${API_BASE_URL}/dashboard`);
+    const dashboardData = await dashboardRes.json();
+    setDevices(dashboardData);
+
+    setReadings((current) => [
+      {
+        ...reading,
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      },
+      ...current,
+    ]);
+
+    // Will be handled by backend later in the next commit
     const generatedAlerts = [];
     if (reading.temperature >= 35) {
       generatedAlerts.push({
