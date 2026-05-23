@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, Battery, Cpu, MapPin, Plus, Radio, Send, Thermometer, Droplets } from "lucide-react";
+
+const API_BASE_URL = "https://i3gk06kum7.execute-api.us-east-1.amazonaws.com";
 
 const initialDevices = [
   {
@@ -132,8 +134,8 @@ function DeviceCard({ device }) {
 }
 
 export default function App() {
-  // Later taken from DynamoDB
-  const [devices, setDevices] = useState(initialDevices);
+
+  const [devices, setDevices] = useState([]);
   const [readings, setReadings] = useState(initialReadings);
   const [alerts, setAlerts] = useState(initialAlerts);
   const [newDevice, setNewDevice] = useState({ deviceId: "", name: "", location: "" });
@@ -143,6 +145,15 @@ export default function App() {
     humidity: "60",
     battery: "90",
   });
+  useEffect(() => {
+    async function loadDevices() {
+      const res = await fetch(`${API_BASE_URL}/devices`);
+      const data = await res.json();
+      setDevices(data);
+    }
+
+    loadDevices();
+  }, []);
 
   const totals = useMemo(() => {
     return {
