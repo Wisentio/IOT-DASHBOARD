@@ -3,44 +3,47 @@ import { Activity, AlertTriangle, Battery, Cpu, MapPin, Plus, Radio, Send, Therm
 
 const API_BASE_URL = "https://i3gk06kum7.execute-api.us-east-1.amazonaws.com";
 
-const initialDevices = [
-  {
-    deviceId: "greenhouse-01",
-    name: "Greenhouse Sensor",
-    location: "Greenhouse A",
-    temperature: 24.8,
-    humidity: 58,
-    battery: 91,
-    status: "OK",
-    lastSeen: "2 min ago",
-  },
-  {
-    deviceId: "warehouse-01",
-    name: "Warehouse Sensor",
-    location: "Storage Room",
-    temperature: 31.4,
-    humidity: 64,
-    battery: 43,
-    status: "WARNING",
-    lastSeen: "6 min ago",
-  },
-  {
-    deviceId: "lab-esp32-01",
-    name: "ESP32 Prototype",
-    location: "Lab Desk",
-    temperature: 38.2,
-    humidity: 82,
-    battery: 14,
-    status: "OK",
-    lastSeen: "just now",
-  },
-];
+// Connected frontend to backend API, 
+// so we can start with empty arrays and load real data instead of mocks
+// This also means we can remove the "mock data" labels and just show real device data from the start
+// const initialDevices = [
+//   {
+//     deviceId: "greenhouse-01",
+//     name: "Greenhouse Sensor",
+//     location: "Greenhouse A",
+//     temperature: 24.8,
+//     humidity: 58,
+//     battery: 91,
+//     status: "OK",
+//     lastSeen: "2 min ago",
+//   },
+//   {
+//     deviceId: "warehouse-01",
+//     name: "Warehouse Sensor",
+//     location: "Storage Room",
+//     temperature: 31.4,
+//     humidity: 64,
+//     battery: 43,
+//     status: "WARNING",
+//     lastSeen: "6 min ago",
+//   },
+//   {
+//     deviceId: "lab-esp32-01",
+//     name: "ESP32 Prototype",
+//     location: "Lab Desk",
+//     temperature: 38.2,
+//     humidity: 82,
+//     battery: 14,
+//     status: "OK",
+//     lastSeen: "just now",
+//   },
+// ];
 
-const initialReadings = [
-  { deviceId: "greenhouse-01", temperature: 24.8, humidity: 58, battery: 91, timestamp: "10:00" },
-  { deviceId: "warehouse-01", temperature: 31.4, humidity: 64, battery: 43, timestamp: "10:02" },
-  { deviceId: "lab-esp32-01", temperature: 38.2, humidity: 82, battery: 14, timestamp: "10:05" },
-];
+// const initialReadings = [
+//   { deviceId: "greenhouse-01", temperature: 24.8, humidity: 58, battery: 91, timestamp: "10:00" },
+//   { deviceId: "warehouse-01", temperature: 31.4, humidity: 64, battery: 43, timestamp: "10:02" },
+//   { deviceId: "lab-esp32-01", temperature: 38.2, humidity: 82, battery: 14, timestamp: "10:05" },
+// ];
 
 const initialAlerts = [
   {
@@ -136,7 +139,7 @@ function DeviceCard({ device }) {
 export default function App() {
 
   const [devices, setDevices] = useState([]);
-  const [readings, setReadings] = useState(initialReadings);
+  const [readings, setReadings] = useState([]);
   const [alerts, setAlerts] = useState(initialAlerts);
   const [newDevice, setNewDevice] = useState({ deviceId: "", name: "", location: "" });
   const [telemetry, setTelemetry] = useState({
@@ -164,20 +167,35 @@ export default function App() {
     };
   }, [devices, alerts, readings]);
 
-  function addDevice(event) {
+  async function addDevice(event) {
     event.preventDefault();
     if (!newDevice.deviceId || !newDevice.name) return;
 
-    const device = {
-      ...newDevice,
-      temperature: 0,
-      humidity: 0,
-      battery: 100,
-      status: "OK",
-      lastSeen: "never",
-    };
+    const res = await fetch(`${API_BASE_URL}/devices`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        deviceId: newDevice.deviceId,
+        name: newDevice.name,
+        location: newDevice.location,
+      }),
+    });
 
-    setDevices((current) => [device, ...current]);
+    const savedDevice = await res.json();
+
+    setDevices((current) => [
+      {
+        temperature: 0,
+        humidity: 0,
+        battery: 100,
+        lastSeen: "no telemetry yet",
+        ...savedDevice,
+      },
+      ...current,
+    ]);
+
     setNewDevice({ deviceId: "", name: "", location: "" });
   }
 
@@ -283,7 +301,6 @@ export default function App() {
           <div className="lg:col-span-2">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-xl font-bold">Live devices</h2>
-              <span className="text-sm text-slate-500">Mock data now, API data later</span>
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {devices.map((device) => (
