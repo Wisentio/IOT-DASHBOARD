@@ -3,75 +3,6 @@ import { Activity, AlertTriangle, Battery, Cpu, MapPin, Plus, Radio, Send, Therm
 
 const API_BASE_URL = "https://i3gk06kum7.execute-api.us-east-1.amazonaws.com";
 
-// Connected frontend to backend API, 
-// so we can start with empty arrays and load real data instead of mocks
-// This also means we can remove the "mock data" labels and just show real device data from the start
-// const initialDevices = [
-//   {
-//     deviceId: "greenhouse-01",
-//     name: "Greenhouse Sensor",
-//     location: "Greenhouse A",
-//     temperature: 24.8,
-//     humidity: 58,
-//     battery: 91,
-//     status: "OK",
-//     lastSeen: "2 min ago",
-//   },
-//   {
-//     deviceId: "warehouse-01",
-//     name: "Warehouse Sensor",
-//     location: "Storage Room",
-//     temperature: 31.4,
-//     humidity: 64,
-//     battery: 43,
-//     status: "WARNING",
-//     lastSeen: "6 min ago",
-//   },
-//   {
-//     deviceId: "lab-esp32-01",
-//     name: "ESP32 Prototype",
-//     location: "Lab Desk",
-//     temperature: 38.2,
-//     humidity: 82,
-//     battery: 14,
-//     status: "OK",
-//     lastSeen: "just now",
-//   },
-// ];
-
-// const initialReadings = [
-//   { deviceId: "greenhouse-01", temperature: 24.8, humidity: 58, battery: 91, timestamp: "10:00" },
-//   { deviceId: "warehouse-01", temperature: 31.4, humidity: 64, battery: 43, timestamp: "10:02" },
-//   { deviceId: "lab-esp32-01", temperature: 38.2, humidity: 82, battery: 14, timestamp: "10:05" },
-// ];
-
-const initialAlerts = [
-  {
-    id: "alert-001",
-    deviceId: "lab-esp32-01",
-    type: "HIGH_TEMPERATURE",
-    message: "Temperature is above 35°C",
-    value: "38.2°C",
-    status: "OPEN",
-    createdAt: "10:05",
-  },
-  {
-    id: "alert-002",
-    deviceId: "lab-esp32-01",
-    type: "LOW_BATTERY",
-    message: "Battery level is below 20%",
-    value: "14%",
-    status: "OPEN",
-    createdAt: "10:05",
-  },
-];
-
-function getStatus({ temperature, humidity, battery }) {
-  if (temperature >= 35 || humidity >= 80 || battery <= 20) return "ALERT";
-  if (temperature >= 30 || humidity >= 70 || battery <= 40) return "WARNING";
-  return "OK";
-}
-
 function statusClass(status) {
   if (status === "ALERT") return "bg-red-100 text-red-700 border-red-200";
   if (status === "WARNING") return "bg-yellow-100 text-yellow-700 border-yellow-200";
@@ -140,7 +71,7 @@ export default function App() {
 
   const [devices, setDevices] = useState([]);
   const [readings, setReadings] = useState([]);
-  const [alerts, setAlerts] = useState(initialAlerts);
+  const [alerts, setAlerts] = useState([]);
   const [newDevice, setNewDevice] = useState({ deviceId: "", name: "", location: "" });
   const [telemetry, setTelemetry] = useState({
     deviceId: "greenhouse-01",
@@ -148,14 +79,22 @@ export default function App() {
     humidity: "60",
     battery: "90",
   });
-  useEffect(() => {
-    async function loadDevices() {
-      const res = await fetch(`${API_BASE_URL}/dashboard`);
-      const data = await res.json();
-      setDevices(data);
-    }
 
-    loadDevices();
+  async function loadDashboard() {
+    const dashboardRes = await fetch(`${API_BASE_URL}/dashboard`);
+    const dashboardData = await dashboardRes.json();
+    setDevices(dashboardData);
+  }
+
+  async function loadAlerts() {
+    const alertsRes = await fetch(`${API_BASE_URL}/alerts`);
+    const alertsData = await alertsRes.json();
+    setAlerts(alertsData);
+  }
+
+  useEffect(() => {
+    loadDashboard();
+    loadAlerts();
   }, []);
 
   const totals = useMemo(() => {
@@ -212,11 +151,6 @@ export default function App() {
       battery: Number(telemetry.battery),
     };
 
-    // Later will be handled by backend,
-    // but for now we can directly determine the status here based on the reading
-    // values and update the device list accordingly.
-    const status = getStatus(reading);
-
     // Get the latest device info.
     const res = await fetch(`${API_BASE_URL}/telemetry`, {
       method: "POST",
@@ -231,11 +165,6 @@ export default function App() {
       return;
     }
 
-    // Reload dashboard after backend saves telemetry
-    const dashboardRes = await fetch(`${API_BASE_URL}/dashboard`);
-    const dashboardData = await dashboardRes.json();
-    setDevices(dashboardData);
-
     setReadings((current) => [
       {
         ...reading,
@@ -247,45 +176,9 @@ export default function App() {
       ...current,
     ]);
 
-    // Will be handled by backend later in the next commit
-    const generatedAlerts = [];
-    if (reading.temperature >= 35) {
-      generatedAlerts.push({
-        id: crypto.randomUUID(),
-        deviceId: reading.deviceId,
-        type: "HIGH_TEMPERATURE",
-        message: "Temperature is above 35°C",
-        value: `${reading.temperature}°C`,
-        status: "OPEN",
-        createdAt: reading.timestamp,
-      });
-    }
-    if (reading.humidity >= 80) {
-      generatedAlerts.push({
-        id: crypto.randomUUID(),
-        deviceId: reading.deviceId,
-        type: "HIGH_HUMIDITY",
-        message: "Humidity is above 80%",
-        value: `${reading.humidity}%`,
-        status: "OPEN",
-        createdAt: reading.timestamp,
-      });
-    }
-    if (reading.battery <= 20) {
-      generatedAlerts.push({
-        id: crypto.randomUUID(),
-        deviceId: reading.deviceId,
-        type: "LOW_BATTERY",
-        message: "Battery level is below 20%",
-        value: `${reading.battery}%`,
-        status: "OPEN",
-        createdAt: reading.timestamp,
-      });
-    }
-
-    if (generatedAlerts.length > 0) {
-      setAlerts((current) => [...generatedAlerts, ...current]);
-    }
+    // Reload dashboard and alerts after backend saves telemetry
+    await loadDashboard();
+    await loadAlerts();
   }
 
   return (
@@ -440,7 +333,7 @@ export default function App() {
             <div className="space-y-3">
               {alerts.length === 0 && <p className="text-sm text-slate-500">No alerts yet.</p>}
               {alerts.slice(0, 8).map((alert) => (
-                <div key={alert.id} className="rounded-xl border border-red-100 bg-red-50 p-4">
+                <div key={alert.deviceId} className="rounded-xl border border-red-100 bg-red-50 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-semibold text-red-800">{alert.type}</p>
