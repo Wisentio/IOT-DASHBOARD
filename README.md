@@ -1,16 +1,38 @@
-# React + Vite
+# IoT Cloud Monitoring Platform
+Devices are added as well as their telemetry
+Later this are monitored and in case of emergency a message is received.
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Architecture
 
-Currently, two official plugins are available:
+```mermaid
+flowchart TD
+    U[User Browser] --> F[React Frontend<br/>AWS Amplify Hosting]
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+    F -->|GET /dashboard| APIGW[Amazon API Gateway]
+    F -->|GET /alerts| APIGW
+    F -->|POST /devices| APIGW
+    F -->|POST /telemetry| APIGW
 
-## React Compiler
+    APIGW --> LD[listDashboard Lambda]
+    APIGW --> LA[listAlerts Lambda]
+    APIGW --> CD[createDevice Lambda]
+    APIGW --> IT[ingestTelemetry Lambda]
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+    LD --> DDB1[(DynamoDB Devices)]
+    LD --> DDB2[(DynamoDB Telemetry)]
 
-## Expanding the ESLint configuration
+    LA --> DDB3[(DynamoDB Alerts)]
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+    CD --> DDB1
+
+    IT --> DDB2
+    IT --> DDB1
+    IT --> SNS1[Amazon SNS TelemetryTopic]
+
+    SNS1 --> SQS[Amazon SQS TelemetryQueue]
+    SQS --> AW[alertWorker Lambda]
+
+    AW --> DDB3
+    AW --> SNS2[Amazon SNS AlertEmailTopic]
+    SNS2 --> EMAIL[Email Notification]
+```

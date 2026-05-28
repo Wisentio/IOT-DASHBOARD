@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, Battery, Cpu, MapPin, Plus, Radio, Send, Thermometer, Droplets } from "lucide-react";
 
-const API_BASE_URL = "https://i3gk06kum7.execute-api.us-east-1.amazonaws.com";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 function statusClass(status) {
   if (status === "ALERT") return "bg-red-100 text-red-700 border-red-200";
@@ -195,10 +195,6 @@ export default function App() {
                 Monitor simulated sensors, send telemetry, detect abnormal readings, and prepare the app for real IoT devices later.
               </p>
             </div>
-            <div className="rounded-2xl bg-white/10 p-4 text-sm">
-              <p className="font-semibold">Backend flow later:</p>
-              <p className="mt-1 text-slate-300">API Gateway → Lambda → DynamoDB → SNS → SQS</p>
-            </div>
           </div>
         </header>
 
@@ -259,38 +255,61 @@ export default function App() {
                 <h2 className="text-lg font-bold">Telemetry simulator</h2>
               </div>
               <div className="space-y-3">
-                <select
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-slate-500"
-                  value={telemetry.deviceId}
-                  onChange={(e) => setTelemetry({ ...telemetry, deviceId: e.target.value })}
-                >
-                  {devices.map((device) => (
-                    <option key={device.deviceId} value={device.deviceId}>
-                      {device.deviceId}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-slate-500"
-                  placeholder="Temperature"
-                  value={telemetry.temperature}
-                  onChange={(e) => setTelemetry({ ...telemetry, temperature: e.target.value })}
-                />
-                <input
-                  type="number"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-slate-500"
-                  placeholder="Humidity"
-                  value={telemetry.humidity}
-                  onChange={(e) => setTelemetry({ ...telemetry, humidity: e.target.value })}
-                />
-                <input
-                  type="number"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-slate-500"
-                  placeholder="Battery"
-                  value={telemetry.battery}
-                  onChange={(e) => setTelemetry({ ...telemetry, battery: e.target.value })}
-                />
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-slate-700">
+                    Device
+                  </span>
+                  <select
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-slate-500"
+                    value={telemetry.deviceId}
+                    onChange={(e) => setTelemetry({ ...telemetry, deviceId: e.target.value })}
+                  >
+                    {devices.map((device) => (
+                      <option key={device.deviceId} value={device.deviceId}>
+                        {device.deviceId}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-slate-700">
+                    Temperature °C
+                  </span>
+                  <input
+                    type="number"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-slate-500"
+                    placeholder="Example: 25"
+                    value={telemetry.temperature}
+                    onChange={(e) => setTelemetry({ ...telemetry, temperature: e.target.value })}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-slate-700">
+                    Humidity %
+                  </span>
+                  <input
+                    type="number"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-slate-500"
+                    placeholder="Example: 60"
+                    value={telemetry.humidity}
+                    onChange={(e) => setTelemetry({ ...telemetry, humidity: e.target.value })}
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-slate-700">
+                    Battery %
+                  </span>
+                  <input
+                    type="number"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-slate-500"
+                    placeholder="Example: 90"
+                    value={telemetry.battery}
+                    onChange={(e) => setTelemetry({ ...telemetry, battery: e.target.value })}
+                  />
+                </label>
                 <button className="w-full rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700">
                   Send telemetry
                 </button>
